@@ -1,0 +1,512 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Poly Prompt Engine",
+    "description": "Assignment Question Iteration & Variation Generation System. Generates domain-aware question variations from a seed question using local open-weight LLMs. National Hackathon 2026 \u2014 PS-8.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health Check",
+        "description": "Check the health of the API, Ollama connection, and Embedding Service.",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/domains": {
+      "get": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "List Domains",
+        "description": "List all available domains and their capabilities.",
+        "operationId": "list_domains_api_v1_domains_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/generate": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Generate Variations",
+        "description": "Generate question variations based on the given request.",
+        "operationId": "generate_variations_api_v1_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/{job_id}": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export Job",
+        "description": "Export generated variations for a specific job.",
+        "operationId": "export_job_api_v1_export__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Export format: json or csv",
+              "default": "json",
+              "title": "Format"
+            },
+            "description": "Export format: json or csv"
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return as a file download",
+              "default": false,
+              "title": "Download"
+            },
+            "description": "Return as a file download"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DomainInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "supported_question_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Question Types"
+          },
+          "topics": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Topics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "description",
+          "supported_question_types",
+          "topics"
+        ],
+        "title": "DomainInfo"
+      },
+      "DomainType": {
+        "type": "string",
+        "enum": [
+          "mathematics",
+          "programming",
+          "science",
+          "business",
+          "language"
+        ],
+        "title": "DomainType"
+      },
+      "DomainsResponse": {
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/DomainInfo"
+            },
+            "type": "array",
+            "title": "Domains"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domains"
+        ],
+        "title": "DomainsResponse"
+      },
+      "ExportResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ],
+            "title": "Format"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "format",
+          "content",
+          "filename"
+        ],
+        "title": "ExportResponse"
+      },
+      "GenerateRequest": {
+        "properties": {
+          "seed_question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Seed Question",
+            "description": "The initial seed question to generate variations from."
+          },
+          "domain": {
+            "$ref": "#/components/schemas/DomainType",
+            "description": "The domain of the question."
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "description": "Number of variations to generate.",
+            "default": 10
+          },
+          "question_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Type of question to generate. If not provided, it will be auto-detected."
+          }
+        },
+        "type": "object",
+        "required": [
+          "seed_question",
+          "domain"
+        ],
+        "title": "GenerateRequest"
+      },
+      "GenerateResponse": {
+        "properties": {
+          "seed_question": {
+            "type": "string",
+            "title": "Seed Question"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/DomainType"
+          },
+          "total_generated": {
+            "type": "integer",
+            "title": "Total Generated"
+          },
+          "duplicate_rate": {
+            "type": "number",
+            "title": "Duplicate Rate"
+          },
+          "variations": {
+            "items": {
+              "$ref": "#/components/schemas/Variation"
+            },
+            "type": "array",
+            "title": "Variations"
+          },
+          "review_queue": {
+            "items": {
+              "$ref": "#/components/schemas/Variation"
+            },
+            "type": "array",
+            "title": "Review Queue"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seed_question",
+          "domain",
+          "total_generated",
+          "duplicate_rate",
+          "variations",
+          "review_queue",
+          "job_id"
+        ],
+        "title": "GenerateResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "unhealthy"
+            ],
+            "title": "Status"
+          },
+          "ollama_connected": {
+            "type": "boolean",
+            "title": "Ollama Connected"
+          },
+          "model_loaded": {
+            "type": "string",
+            "title": "Model Loaded"
+          },
+          "embedding_model_loaded": {
+            "type": "boolean",
+            "title": "Embedding Model Loaded"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "ollama_connected",
+          "model_loaded",
+          "embedding_model_loaded",
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "QuestionType": {
+        "type": "string",
+        "enum": [
+          "mcq",
+          "fill_in_the_blank",
+          "coding",
+          "descriptive"
+        ],
+        "title": "QuestionType"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Variation": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answer_key": {
+            "type": "string",
+            "title": "Answer Key"
+          },
+          "difficulty": {
+            "type": "string",
+            "title": "Difficulty"
+          },
+          "question_type": {
+            "type": "string",
+            "title": "Question Type"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "subtopic": {
+            "type": "string",
+            "title": "Subtopic"
+          },
+          "confidence_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence Score"
+          },
+          "flagged_for_review": {
+            "type": "boolean",
+            "title": "Flagged For Review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "answer_key",
+          "difficulty",
+          "question_type",
+          "topic",
+          "subtopic",
+          "confidence_score",
+          "flagged_for_review"
+        ],
+        "title": "Variation"
+      }
+    }
+  }
+}
