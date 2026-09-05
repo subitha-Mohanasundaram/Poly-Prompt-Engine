@@ -1,11 +1,11 @@
 """
-Core variation generation engine — orchestrates the full pipeline.
+Core variation generation engine — orchestrates the full PS8 + PS2 pipeline.
 """
 import asyncio
 import logging
 import math
 import uuid
-from typing import List
+from typing import List, Optional
 
 from app.config import Settings
 from app.llm.client import OllamaClient
@@ -18,12 +18,13 @@ from app.services.answer_generator import AnswerGenerator
 from app.services.duplicate_detector import DuplicateDetector
 from app.services.difficulty_validator import DifficultyValidator
 from app.services.review_queue import ReviewQueueService
+from app.services.hallucination_detector import HallucinationDetector
 
 logger = logging.getLogger(__name__)
 
 
 class VariationEngine:
-    """Main orchestrator for generating question variations."""
+    """Main orchestrator for generating question variations with PS8 + PS2 integration."""
 
     def __init__(
         self,
@@ -32,18 +33,20 @@ class VariationEngine:
         difficulty_validator: DifficultyValidator,
         review_queue_service: ReviewQueueService,
         settings: Settings,
+        hallucination_detector: Optional[HallucinationDetector] = None,
     ):
         self.llm_client = llm_client
         self.duplicate_detector = duplicate_detector
         self.difficulty_validator = difficulty_validator
         self.review_queue_service = review_queue_service
         self.settings = settings
+        self.hallucination_detector = hallucination_detector
 
         self.parser = QuestionParser(llm_client)
         self.answer_generator = AnswerGenerator(llm_client)
 
     async def generate(self, request: GenerateRequest) -> GenerateResponse:
-        """Full pipeline for generating question variations."""
+        """Full pipeline for generating question variations and scoring reliability."""
         job_id = str(uuid.uuid4())
         logger.info(f"Job {job_id}: Starting generation of {request.count} variations.")
 
@@ -101,6 +104,9 @@ class VariationEngine:
                     subtopic=var.subtopic,
                     confidence_score=round(confidence, 3),
                     flagged_for_review=False,
+                    reliability_score=1.0,
+                    hallucination_flag=False,
+                    hallucination_reason=None,
                 )
             )
 
@@ -109,7 +115,6 @@ class VariationEngine:
         validated_dicts = await self.difficulty_validator.validate(
             analysis.detected_difficulty, variation_dicts
         )
-        # Apply flags back
         for i, vd in enumerate(validated_dicts):
             if vd.get("flagged_for_review"):
                 variations[i].flagged_for_review = True
@@ -117,7 +122,18 @@ class VariationEngine:
                     variations[i].confidence_score * 0.7, 3
                 )
 
-        # ── 8. Duplicate detection ──────────────────────────────────────
+        # ── 8. PS2 Hallucination & Reliability Detection ────────────────
+        if self.hallucination_detector:
+            variation_dicts_for_h = [v.model_dump() for v in variations]
+            evaluated_dicts = await self.hallucination_detector.evaluate_batch(
+                request.seed_question, request.domain, variation_dicts_for_h
+            )
+            for i, ed in enumerate(evaluated_dicts):
+                variations[i].reliability_score = ed.get("reliability_score", 1.0)
+                variations[i].hallucination_flag = ed.get("hallucination_flag", False)
+                variations[i].hallucination_reason = ed.get("hallucination_reason", None)
+
+        # ── 9. Duplicate detection ──────────────────────────────────────
         question_texts = [v.question for v in variations]
         dup_indices, duplicate_rate = self.duplicate_detector.detect(
             request.seed_question, question_texts
@@ -127,15 +143,13 @@ class VariationEngine:
             f"({len(dup_indices)} duplicates)"
         )
 
-        # Remove duplicates (keep non-duplicate variations)
         if dup_indices:
             dup_set = set(dup_indices)
             variations = [v for i, v in enumerate(variations) if i not in dup_set]
-            # Re-index
             for i, v in enumerate(variations):
                 v.id = i + 1
 
-        # ── 9. Regeneration if duplicate rate too high ──────────────────
+        # ── 10. Regeneration if duplicate rate too high ─────────────────
         max_regen_rounds = 2
         regen_round = 0
         while duplicate_rate > 0.10 and regen_round < max_regen_rounds:
@@ -167,21 +181,23 @@ class VariationEngine:
                         subtopic=var.subtopic,
                         confidence_score=0.85,
                         flagged_for_review=False,
+                        reliability_score=0.90,
+                        hallucination_flag=False,
+                        hallucination_reason=None,
                     )
                 )
-            # Re-check duplicates
             question_texts = [v.question for v in variations]
             dup_indices, duplicate_rate = self.duplicate_detector.detect(
                 request.seed_question, question_texts
             )
 
-        # ── 10. Build review queue ──────────────────────────────────────
+        # ── 11. Build review queue (includes PS2 hallucination flags) ────
         borderline = self.duplicate_detector.get_borderline_indices(
             request.seed_question, [v.question for v in variations]
         )
         review_queue = self.review_queue_service.build_queue(variations, borderline)
 
-        # ── 11. Build response ──────────────────────────────────────────
+        # ── 12. Build response ──────────────────────────────────────────
         return GenerateResponse(
             seed_question=request.seed_question,
             domain=request.domain,
@@ -200,9 +216,6 @@ class VariationEngine:
             try:
                 raw_json = await self.llm_client.generate_structured(prompt, schema)
                 batch = LLMVariationBatch.model_validate_json(raw_json)
-                logger.debug(
-                    f"Batch parsed successfully: {len(batch.variations)} variations"
-                )
                 return batch.variations
             except Exception as e:
                 logger.warning(

@@ -1,8 +1,8 @@
 """
-Response schemas.
+Response schemas for Poly Prompt Engine (PS8 + PS2).
 """
 from pydantic import BaseModel, Field
-from typing import List, Dict, Literal
+from typing import List, Dict, Optional, Literal
 from app.models.domain import DomainType
 
 class Variation(BaseModel):
@@ -15,6 +15,10 @@ class Variation(BaseModel):
     subtopic: str
     confidence_score: float = Field(..., ge=0, le=1)
     flagged_for_review: bool
+    # PS2 Hallucination & Reliability Metrics
+    reliability_score: float = Field(default=1.0, ge=0, le=1)
+    hallucination_flag: bool = Field(default=False)
+    hallucination_reason: Optional[str] = Field(default=None)
 
 class GenerateResponse(BaseModel):
     seed_question: str

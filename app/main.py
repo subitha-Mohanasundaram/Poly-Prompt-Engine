@@ -1,5 +1,5 @@
 """
-Poly Prompt Engine — FastAPI application factory.
+Poly Prompt Engine — FastAPI application factory (PS8 + PS2).
 """
 import logging
 from contextlib import asynccontextmanager
@@ -15,6 +15,7 @@ from app.utils.embeddings import EmbeddingService
 from app.services.duplicate_detector import DuplicateDetector
 from app.services.difficulty_validator import DifficultyValidator
 from app.services.review_queue import ReviewQueueService
+from app.services.hallucination_detector import HallucinationDetector
 from app.services.variation_engine import VariationEngine
 from app.api.router import api_router
 
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
-    logger.info("Starting up Poly Prompt Engine...")
+    logger.info("Starting up Poly Prompt Engine (PS8 + PS2)...")
 
     # --- Initialize services ---
     ollama_client = OllamaClient(
@@ -47,17 +48,24 @@ async def lifespan(app: FastAPI):
     review_queue_service = ReviewQueueService(
         low_confidence_threshold=settings.low_confidence_threshold,
     )
+    hallucination_detector = HallucinationDetector(
+        embedding_service=embedding_service,
+        llm_client=ollama_client,
+        threshold=0.85,
+    )
     variation_engine = VariationEngine(
         llm_client=ollama_client,
         duplicate_detector=duplicate_detector,
         difficulty_validator=difficulty_validator,
         review_queue_service=review_queue_service,
         settings=settings,
+        hallucination_detector=hallucination_detector,
     )
 
     # Store in app state for dependency injection
     app.state.ollama_client = ollama_client
     app.state.embedding_service = embedding_service
+    app.state.hallucination_detector = hallucination_detector
     app.state.variation_engine = variation_engine
     app.state.settings = settings
 
@@ -71,9 +79,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Poly Prompt Engine",
     description=(
-        "Assignment Question Iteration & Variation Generation System. "
-        "Generates domain-aware question variations from a seed question "
-        "using local open-weight LLMs. National Hackathon 2026 — PS-8."
+        "Assignment Question Iteration & Variation Generation System with "
+        "AI Hallucination Detection & Reliability Scoring (PS8 + PS2). "
+        "National Hackathon 2026."
     ),
     version="1.0.0",
     lifespan=lifespan,

@@ -1,8 +1,8 @@
 """
 LLM schemas for structured output generation.
 """
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
 class LLMVariation(BaseModel):
     question: str
@@ -32,3 +32,13 @@ class LLMDifficultyScore(BaseModel):
 
 class LLMDifficultyBatch(BaseModel):
     scores: List[LLMDifficultyScore]
+
+# PS2 Hallucination Evaluation Schemas
+class LLMHallucinationScore(BaseModel):
+    variation_index: int
+    groundedness_score: float = Field(..., ge=0.0, le=1.0)
+    factuality_score: float = Field(..., ge=0.0, le=1.0)
+    reasoning: Optional[str] = None
+
+class LLMHallucinationBatch(BaseModel):
+    evaluations: List[LLMHallucinationScore]

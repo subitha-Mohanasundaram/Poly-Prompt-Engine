@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Poly Prompt Engine",
-    "description": "Assignment Question Iteration & Variation Generation System. Generates domain-aware question variations from a seed question using local open-weight LLMs. National Hackathon 2026 \u2014 PS-8.",
+    "description": "Assignment Question Iteration & Variation Generation System with AI Hallucination Detection & Reliability Scoring (PS8 + PS2). National Hackathon 2026.",
     "version": "1.0.0"
   },
   "paths": {
@@ -491,6 +491,29 @@
           "flagged_for_review": {
             "type": "boolean",
             "title": "Flagged For Review"
+          },
+          "reliability_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Reliability Score",
+            "default": 1.0
+          },
+          "hallucination_flag": {
+            "type": "boolean",
+            "title": "Hallucination Flag",
+            "default": false
+          },
+          "hallucination_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hallucination Reason"
           }
         },
         "type": "object",
