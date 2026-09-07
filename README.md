@@ -56,7 +56,7 @@ graph TD;
 |---|---|---|
 | `OLLAMA_BASE_URL` | URL for Ollama | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Model to use | `qwen2.5:7b` |
-
+                               
 ## Testing
 Run `pytest` in the root directory to execute the test suite.
 
